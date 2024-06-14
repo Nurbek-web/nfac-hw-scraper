@@ -4,14 +4,17 @@ const cron = require("node-cron");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+let currentPage = 1;
 
-async function scrapeBooks() {
+async function scrapeBooks(pageNumber) {
+  const url = `https://books.toscrape.com/catalogue/page-${pageNumber}.html`;
+
   try {
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
-    await page.goto("https://books.toscrape.com/");
+    await page.goto(url);
 
-    let books = await page.evaluate(() => {
+    const books = await page.evaluate(() => {
       const headings_elements = document.querySelectorAll(".product_pod");
       const headings_array = Array.from(headings_elements);
       return headings_array.map((heading) => {
@@ -26,29 +29,40 @@ async function scrapeBooks() {
     });
 
     await browser.close();
-    console.log(books);
+    console.log(`Page ${pageNumber}:`, books);
     return books;
   } catch (error) {
-    console.error("Error:", error);
+    console.error(`Error on page ${pageNumber}:`, error);
     return [];
   }
 }
 
-// Schedule the scraping to run every 8 hours
-cron.schedule("0 */8 * * *", async () => {
-  console.log("Running the scrapeBooks job...");
-  await scrapeBooks();
+// Schedule the scraping to run every 40 minutes
+cron.schedule("*/40 * * * *", async () => {
+  console.log(`Running the scrapeBooks job for page ${currentPage}...`);
+  const books = await scrapeBooks(currentPage);
+  if (books.length > 0) {
+    currentPage++;
+  } else {
+    console.log("No more pages to scrape.");
+  }
 });
 
-// Run the scraping immediately when the server starts
+// Run the scraping for the first page immediately when the server starts
 (async () => {
   console.log("Running the scrapeBooks job at server startup...");
-  await scrapeBooks();
+  const books = await scrapeBooks(currentPage);
+  if (books.length > 0) {
+    currentPage++;
+  }
 })();
 
 app.get("/scrape-books", async (req, res) => {
-  const books = await scrapeBooks();
+  const books = await scrapeBooks(currentPage);
   res.json(books);
+  if (books.length > 0) {
+    currentPage++;
+  }
 });
 
 app.listen(PORT, () => {
