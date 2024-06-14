@@ -24,9 +24,9 @@ async function scrapeBooks() {
         };
       });
     });
-    console.log(books);
 
     await browser.close();
+    console.log(books);
     return books;
   } catch (error) {
     console.error("Error:", error);
@@ -39,6 +39,12 @@ cron.schedule("0 */8 * * *", async () => {
   console.log("Running the scrapeBooks job...");
   await scrapeBooks();
 });
+
+// Run the scraping immediately when the server starts
+(async () => {
+  console.log("Running the scrapeBooks job at server startup...");
+  await scrapeBooks();
+})();
 
 app.get("/scrape-books", async (req, res) => {
   const books = await scrapeBooks();
